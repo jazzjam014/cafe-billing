@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SDF Cafe Billing System</title>
+  <style>
+    * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    body { margin: 0; background-color: #f4f6f9; color: #333; }
+    header { background-color: #2c3e50; color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; }
+    .container { display: flex; gap: 20px; padding: 20px; max-width: 1200px; margin: auto; }
+    
+    /* Menu Section */
+    .menu-section { flex: 2; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; margin-top: 15px; }
+    .card { background: #fafafa; border: 1px solid #ddd; border-radius: 6px; padding: 15px; text-align: center; cursor: pointer; transition: 0.2s; }
+    .card:hover { transform: translateY(-3px); border-color: #27ae60; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+    .card h4 { margin: 0 0 5px 0; color: #2c3e50; }
+    .card p { margin: 0; color: #27ae60; font-weight: bold; }
+    .badge { display: inline-block; padding: 2px 8px; font-size: 0.75rem; background: #e0e0e0; border-radius: 12px; margin-top: 8px; }
+
+    /* Cart / Receipt Section */
+    .cart-section { flex: 1.2; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: flex; flex-direction: column; justify-content: space-between; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { padding: 8px; text-align: left; border-bottom: 1px solid #eee; font-size: 0.9rem; }
+    .qty-btn { background: #e74c3c; color: white; border: none; padding: 2px 6px; border-radius: 3px; cursor: pointer; }
+    .total-box { margin-top: 20px; border-top: 2px solid #333; padding-top: 10px; }
+    .total-row { display: flex; justify-content: space-between; font-weight: bold; font-size: 1.1rem; margin-top: 5px; }
+    .btn-checkout { width: 100%; background: #27ae60; color: white; border: none; padding: 12px; border-radius: 6px; font-size: 1rem; cursor: pointer; margin-top: 15px; }
+    .btn-checkout:hover { background: #219150; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h2>☕ SDF Cafe Billing System</h2>
+    <span style="font-size: 0.9rem; opacity: 0.8;">Server: PostgreSQL 17 (localhost:5432)</span>
+  </header>
+
+  <div class="container">
+    <!-- Menu Display -->
+    <div class="menu-section">
+      <h3>Menu Items</h3>
+      <div id="menu-container" class="menu-grid">Loading menu...</div>
+    </div>
+
+    <!-- Current Order / Billing -->
+    <div class="cart-section">
+      <div>
+        <h3>Current Bill</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Qty</th>
+              <th>Subtotal</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="cart-table">
+            <tr><td colspan="4" style="text-align: center; color: #888;">No items added yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="total-box">
+        <div class="total-row">
+          <span>Total Payable:</span>
+          <span id="grand-total">$0.00</span>
+        </div>
+        <button class="btn-checkout" onclick="processCheckout()">Process Order & Save to Database</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let cart = {};
+
+    // 1. Fetch menu items from Express -> PostgreSQL
+    async function loadMenu() {
+      try {
+        const response = await fetch('/api/menu');
+        const items = await response.json();
+        const container = document.getElementById('menu-container');
+        container.innerHTML = '';
+
+        items.forEach(item => {
+          const card = document.createElement('div');
+          card.className = 'card';
+          card.onclick = () => addToCart(item);
+          card.innerHTML = `
+            <h4>${item.item_name}</h4>
+            <p>$${parseFloat(item.price).toFixed(2)}</p>
+            <span class="badge">${item.category || 'General'}</span>
+          `;
+          container.appendChild(card);
+        });
+      } catch (err) {
+        document.getElementById('menu-container').innerText = 'Failed to load menu items.';
+      }
+    }
+
+    // 2. Add item to current bill
+    function addToCart(item) {
+      if (cart[item.item_id]) {
+        cart[item.item_id].quantity += 1;
+        cart[item.item_id].subtotal = cart[item.item_id].quantity * parseFloat(item.price);
+      } else {
+        cart[item.item_id] = {
+          item_id: item.item_id,
+          name: item.item_name,
+          price: parseFloat(item.price),
+          quantity: 1,
+          subtotal: parseFloat(item.price)
+        };
+      }
+      renderCart();
+    }
+
+    // 3. Remove/Decrease quantity
+    function removeFromCart(id) {
+      if (cart[id].quantity > 1) {
+        cart[id].quantity -= 1;
+        cart[id].subtotal = cart[id].quantity * cart[id].price;
+      } else {
+        delete cart[id];
+      }
+      renderCart();
+    }
+
+    // 4. Update order UI
+    function renderCart() {
+      const tbody = document.getElementById('cart-table');
+      tbody.innerHTML = '';
+      let grandTotal = 0;
+
+      const keys = Object.keys(cart);
+      if (keys.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #888;">No items added yet</td></tr>';
+        document.getElementById('grand-total').innerText = '$0.00';
+        return;
+      }
+
+      keys.forEach(id => {
+        const item = cart[id];
+        grandTotal += item.subtotal;
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${item.name}</td>
+          <td>${item.quantity}</td>
+          <td>$${item.subtotal.toFixed(2)}</td>
+          <td><button class="qty-btn" onclick="removeFromCart(${item.item_id})">-</button></td>
+        `;
+        tbody.appendChild(row);
+      });
+
+      document.getElementById('grand-total').innerText = `$${grandTotal.toFixed(2)}`;
+    }
+
+    // 5. Save completed order to PostgreSQL
+    async function processCheckout() {
+      const itemsArr = Object.values(cart);
+      if (itemsArr.length === 0) {
+        alert('Please add items to the order first!');
+        return;
+      }
+
+      const totalAmount = itemsArr.reduce((sum, item) => sum + item.subtotal, 0);
+
+      try {
+        const response = await fetch('/api/orders', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: itemsArr, total_amount: totalAmount })
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+          alert(`Order #${data.order_id} recorded successfully! Total: $${data.total_amount}`);
+          cart = {};
+          renderCart();
+        } else {
+          alert('Error processing order: ' + data.error);
+        }
+      } catch (err) {
+        alert('Failed to connect to server.');
+      }
+    }
+
+    // Load initial menu
+    loadMenu();
+  </script>
+</body>
+</html>
