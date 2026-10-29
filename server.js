@@ -26,23 +26,22 @@ async function initTables() {
       )
     `);
 
-  // 2. Seed default menu items if they don't exist
-    await pool.query('DELETE FROM menu_items;');
-const existing = await pool.query('SELECT COUNT(*) FROM menu_items');
-if (parseInt(existing.rows[0].count, 10) === 0) {
-  await pool.query(`
-    INSERT INTO menu_items (item_name, category, price) VALUES
-    ('Espresso', 'Coffee', 120.00),
-    ('Americano', 'Coffee', 130.00),
-    ('Cappuccino', 'Coffee', 150.00),
-    ('Caffè Latte', 'Coffee', 150.00),
-    ('Caramel Macchiato', 'Coffee', 165.00),
-    ('Green Tea', 'Tea', 120.00),
-    ('Croissant', 'Pastry', 95.00),
-    ('Chocolate Muffin', 'Pastry', 110.00)
-  `);
-  console.log('✅ Seeded default menu items successfully.');
-}
+  // 2. Seed default menu items if empty
+    const existing = await pool.query('SELECT COUNT(*) FROM menu_items');
+    if (parseInt(existing.rows[0].count, 10) === 0) {
+      await pool.query(`
+        INSERT INTO menu_items (item_name, category, price) VALUES
+        ('Espresso', 'Coffee', 120.00),
+        ('Americano', 'Coffee', 130.00),
+        ('Cappuccino', 'Coffee', 150.00),
+        ('Caffè Latte', 'Coffee', 150.00),
+        ('Caramel Macchiato', 'Coffee', 165.00),
+        ('Green Tea', 'Tea', 120.00),
+        ('Croissant', 'Pastry', 95.00),
+        ('Chocolate Muffin', 'Pastry', 110.00)
+      `);
+      console.log('✅ Seeded default menu items successfully.');
+    }
 
     // 3. Create orders table
     await pool.query(`
