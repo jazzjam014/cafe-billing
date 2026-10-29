@@ -176,7 +176,7 @@
 
         const data = await response.json();
         if (response.ok) {
-          alert(`Order #${data.order_id} recorded successfully! Total: $${data.total_amount}`);
+          alert(`Order #${data.order_id} recorded successfully! Total: ₱${data.total_amount}`);
           cart = {};
           renderCart();
         } else {
