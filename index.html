@@ -90,7 +90,7 @@
           card.onclick = () => addToCart(item);
           card.innerHTML = `
             <h4>${item.item_name}</h4>
-            <p>$${parseFloat(item.price).toFixed(2)}</p>
+            <p>₱${parseFloat(item.price).toFixed(2)}</p>
             <span class="badge">${item.category || 'General'}</span>
           `;
           container.appendChild(card);
@@ -137,7 +137,7 @@
       const keys = Object.keys(cart);
       if (keys.length === 0) {
         tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #888;">No items added yet</td></tr>';
-        document.getElementById('grand-total').innerText = '$0.00';
+        document.getElementById('grand-total').innerText = '₱0.00';
         return;
       }
 
@@ -148,13 +148,13 @@
         row.innerHTML = `
           <td>${item.name}</td>
           <td>${item.quantity}</td>
-          <td>$${item.subtotal.toFixed(2)}</td>
+          <td>₱${item.subtotal.toFixed(2)}</td>
           <td><button class="qty-btn" onclick="removeFromCart(${item.item_id})">-</button></td>
         `;
         tbody.appendChild(row);
       });
 
-      document.getElementById('grand-total').innerText = `$${grandTotal.toFixed(2)}`;
+      document.getElementById('grand-total').innerText = `₱${grandTotal.toFixed(2)}`;
     }
 
     // 5. Save completed order to PostgreSQL
