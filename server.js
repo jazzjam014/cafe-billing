@@ -12,31 +12,66 @@ app.use(express.static(__dirname));
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
+
 // Initialize additional tables required for orders and items
 async function initTables() {
   try {
+    // 1. Create menu_items table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS menu_items (
+        item_id SERIAL PRIMARY KEY,
+        item_name VARCHAR(100) NOT NULL,
+        category VARCHAR(50),
+        price DECIMAL(10, 2) NOT NULL
+      )
+    `);
+
+    // 2. Seed default menu items if table is empty
+    const existing = await pool.query('SELECT COUNT(*) FROM menu_items');
+    if (parseInt(existing.rows[0].count, 10) === 0) {
+      await pool.query(`
+        INSERT INTO menu_items (item_name, category, price) VALUES
+        ('Espresso', 'Coffee', 3.50),
+        ('Americano', 'Coffee', 4.00),
+        ('Cappuccino', 'Coffee', 4.50),
+        ('Caffè Latte', 'Coffee', 4.50),
+        ('Caramel Macchiato', 'Coffee', 5.00),
+        ('Green Tea', 'Tea', 3.50),
+        ('Croissant', 'Pastry', 3.00),
+        ('Chocolate Muffin', 'Pastry', 3.50)
+      `);
+      console.log('✅ Seeded default menu items successfully.');
+    }
+
+    // 3. Create orders table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS orders (
-          order_id SERIAL PRIMARY KEY,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          total_amount DECIMAL(10, 2) NOT NULL,
-          payment_status VARCHAR(20) DEFAULT 'Paid'
-      );
-
-      CREATE TABLE IF NOT EXISTS order_items (
-          order_item_id SERIAL PRIMARY KEY,
-          order_id INT REFERENCES orders(order_id) ON DELETE CASCADE,
-          item_id INT REFERENCES menu_items(item_id),
-          quantity INT NOT NULL,
-          subtotal DECIMAL(10, 2) NOT NULL
-      );
+        order_id SERIAL PRIMARY KEY,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        total_amount DECIMAL(10, 2) NOT NULL,
+        payment_status VARCHAR(20) DEFAULT 'Paid'
+      )
     `);
-    console.log('✅ Orders and Order Items tables verified/created successfully.');
+
+    // 4. Create order_items table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS order_items (
+        order_item_id SERIAL PRIMARY KEY,
+        order_id INT REFERENCES orders(order_id) ON DELETE CASCADE,
+        item_id INT REFERENCES menu_items(item_id),
+        quantity INT NOT NULL,
+        subtotal DECIMAL(10, 2) NOT NULL
+      )
+    `);
+
+    console.log('✅ All tables verified/created successfully.');
   } catch (err) {
     console.error('❌ Error setting up database tables:', err);
   }
 }
 
+// Call table initialization when server starts
+initTables();
 // ---------------- API ENDPOINTS ----------------
 
 // GET: Fetch all menu items from menu_items table
